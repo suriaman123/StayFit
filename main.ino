@@ -1,21 +1,11 @@
 /*
-  Wrist Tracker - Starter Code
+  Health Tracker
   ESP32 + MAX30102 (heart rate/SpO2) + MPU6050 (accelerometer/gyro)
-
-  Wiring (ESP32 DevKitC default I2C pins):
-    SDA -> GPIO21
-    SCL -> GPIO22
-    VCC -> 3.3V (both sensors)
-    GND -> GND (both sensors)
-
-  Required libraries (install via Arduino Library Manager):
-    - "SparkFun MAX3010x Pulse and Proximity Sensor Library" (for MAX30102)
-    - "Adafruit MPU6050" + "Adafruit Unified Sensor" (for MPU6050)
 */
 
 #include <Wire.h>
-#include "MAX30105.h"          // SparkFun library, also covers MAX30102
-#include "heartRate.h"         // SparkFun beat-detection algorithm (ships with the library)
+#include "MAX30105.h"          // SparkFun library -> also covers MAX30102
+#include "heartRate.h"         // SparkFun beat-detection algorithm
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 
@@ -24,18 +14,18 @@ Adafruit_MPU6050 mpu;
 
 // simple step-detection state
 float lastMagnitude = 0;
-float threshold = 1.5;      // tune this based on real data
+float threshold = 1.5;     
 unsigned long lastStepTime = 0;
 unsigned long stepCount = 0;
 
-// heart rate calculation state
-const byte RATE_SIZE = 4;   // number of readings to average
+// heart rate calculation 
+const byte RATE_SIZE = 4;  
 byte rates[RATE_SIZE];
 byte rateSpot = 0;
 long lastBeat = 0;          // timestamp of last detected beat
 float beatsPerMinute;
 int beatAvg;
-long irBaseline = 50000;    // below this, assume no finger/skin contact
+long irBaseline = 50000;    // below this no finger/skin contact
 
 void setup() {
   Serial.begin(115200);
@@ -43,17 +33,17 @@ void setup() {
 
   Wire.begin(21, 22); // SDA, SCL
 
-  // --- MAX30102 setup ---
+  //  MAX30102 setup 
   if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) {
     Serial.println("MAX30102 not found. Check wiring.");
   } else {
-    particleSensor.setup(); // default settings: LED brightness, sample rate, pulse width
+    particleSensor.setup();             // default settings: LED brightness, sample rate, pulse width
     particleSensor.setPulseAmplitudeRed(0x0A);
     particleSensor.setPulseAmplitudeGreen(0);
     Serial.println("MAX30102 initialized.");
   }
 
-  // --- MPU6050 setup ---
+  //  MPU6050 setup 
   if (!mpu.begin()) {
     Serial.println("MPU6050 not found. Check wiring.");
   } else {
@@ -67,11 +57,11 @@ void setup() {
 }
 
 void loop() {
-  // --- Heart rate sensor raw reading ---
+  //  Heart rate sensor raw reading 
   long irValue = particleSensor.getIR();
   long redValue = particleSensor.getRed();
 
-  // --- Beat detection ---
+  //  Beat detection 
   if (checkForBeat(irValue) == true) {
     long delta = millis() - lastBeat;
     lastBeat = millis();
@@ -91,24 +81,24 @@ void loop() {
 
   bool fingerDetected = irValue > irBaseline;
 
-  // --- Accelerometer/gyro reading ---
+  //  Accelerometer/gyro reading 
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
 
-  // magnitude of acceleration vector, minus gravity baseline (~9.8)
+  // magnitude of acceleration vector, minus gravity baseline 
   float magnitude = sqrt(a.acceleration.x * a.acceleration.x +
                           a.acceleration.y * a.acceleration.y +
                           a.acceleration.z * a.acceleration.z);
   float delta = magnitude - 9.8;
 
-  // very basic peak-detection step counter (placeholder - needs tuning)
+  // peak-detection step counter (placeholder - needs tuning)
   unsigned long now = millis();
   if (abs(delta) > threshold && (now - lastStepTime) > 300) {
     stepCount++;
     lastStepTime = now;
   }
 
-  // --- Print everything ---
+
   Serial.print("IR: ");
   Serial.print(irValue);
   Serial.print(fingerDetected ? " (contact)" : " (no contact)");
@@ -121,5 +111,5 @@ void loop() {
   Serial.print(" | Steps: ");
   Serial.println(stepCount);
 
-  delay(20); // beat detection wants a fast, steady sample rate
+  delay(20); 
 }
