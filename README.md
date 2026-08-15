@@ -26,6 +26,3 @@ A basic ESP32 sketch that reads heart rate (MAX30102) and motion/steps (MPU6050)
 - Battery/power management
 - Enclosure/strap design
 
-## Files
-
-- `wrist_tracker_starter.ino` — main sketch
