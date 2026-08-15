@@ -15,6 +15,7 @@
 
 #include <Wire.h>
 #include "MAX30105.h"          // SparkFun library, also covers MAX30102
+#include "heartRate.h"         // SparkFun beat-detection algorithm (ships with the library)
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 
@@ -26,6 +27,15 @@ float lastMagnitude = 0;
 float threshold = 1.5;      // tune this based on real data
 unsigned long lastStepTime = 0;
 unsigned long stepCount = 0;
+
+// heart rate calculation state
+const byte RATE_SIZE = 4;   // number of readings to average
+byte rates[RATE_SIZE];
+byte rateSpot = 0;
+long lastBeat = 0;          // timestamp of last detected beat
+float beatsPerMinute;
+int beatAvg;
+long irBaseline = 50000;    // below this, assume no finger/skin contact
 
 void setup() {
   Serial.begin(115200);
@@ -61,6 +71,26 @@ void loop() {
   long irValue = particleSensor.getIR();
   long redValue = particleSensor.getRed();
 
+  // --- Beat detection ---
+  if (checkForBeat(irValue) == true) {
+    long delta = millis() - lastBeat;
+    lastBeat = millis();
+
+    beatsPerMinute = 60 / (delta / 1000.0);
+
+    if (beatsPerMinute < 255 && beatsPerMinute > 20) {
+      rates[rateSpot++] = (byte)beatsPerMinute;
+      rateSpot %= RATE_SIZE;
+
+      // average the last few readings for a stabler number
+      beatAvg = 0;
+      for (byte x = 0; x < RATE_SIZE; x++) beatAvg += rates[x];
+      beatAvg /= RATE_SIZE;
+    }
+  }
+
+  bool fingerDetected = irValue > irBaseline;
+
   // --- Accelerometer/gyro reading ---
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
@@ -81,12 +111,15 @@ void loop() {
   // --- Print everything ---
   Serial.print("IR: ");
   Serial.print(irValue);
-  Serial.print(" | Red: ");
-  Serial.print(redValue);
+  Serial.print(fingerDetected ? " (contact)" : " (no contact)");
+  Serial.print(" | BPM: ");
+  Serial.print(beatsPerMinute);
+  Serial.print(" | AvgBPM: ");
+  Serial.print(beatAvg);
   Serial.print(" | AccelMag: ");
   Serial.print(magnitude, 2);
   Serial.print(" | Steps: ");
   Serial.println(stepCount);
 
-  delay(50); // ~20Hz loop
+  delay(20); // beat detection wants a fast, steady sample rate
 }
